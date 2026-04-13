@@ -117,6 +117,7 @@
   max-width: 780px;
   line-height: 1.75;
   color: var(--text);
+  cursor: text;
 }
 
 .rendered :global(h1) {

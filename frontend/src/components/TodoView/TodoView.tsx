@@ -238,7 +238,7 @@ export default function TodoView() {
               spellCheck={false}
             />
           ) : (
-            <div className={styles.rendered}>
+            <div className={styles.rendered} onDoubleClick={() => setEditing(true)}>
               <ReactMarkdown
                 remarkPlugins={[remarkFrontmatter, remarkGfm]}
                 rehypePlugins={[rehypeRaw]}
