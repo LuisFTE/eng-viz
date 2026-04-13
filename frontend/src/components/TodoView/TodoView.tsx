@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -23,6 +23,8 @@ export default function TodoView() {
   const [editBuffer, setEditBuffer] = useState('');
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  // Suppress the next SSE reload when we ourselves just wrote the file
+  const suppressNextReload = useRef(false);
 
   const loadFiles = useCallback(async () => {
     const list = await fetchTodoFiles();
@@ -52,7 +54,13 @@ export default function TodoView() {
 
   useEffect(() => {
     const es = new EventSource('/api/watch');
-    es.onmessage = () => { if (selected) void loadFile(selected); };
+    es.onmessage = () => {
+      if (suppressNextReload.current) {
+        suppressNextReload.current = false;
+        return;
+      }
+      if (selected) void loadFile(selected);
+    };
     return () => es.close();
   }, [selected, loadFile]);
 
@@ -64,8 +72,11 @@ export default function TodoView() {
       if (count !== index) return match;
       return `${pre}${state === ' ' ? 'x' : ' '}${post}`;
     });
+    // Update state immediately so UI responds without waiting for the write
     setContent(updated);
     setEditBuffer(updated);
+    // Flag to skip the SSE reload that will fire after the write
+    suppressNextReload.current = true;
     await writeFileContent(selected, updated, 'todo');
   }, [content, selected]);
 
@@ -132,12 +143,13 @@ export default function TodoView() {
       return <input type={type} checked={checked} {...props} />;
     },
 
-    // Style task list items
+    // Style task list items — keep 'task-list-item' so the CSS :has() selector
+    // for strikethrough can still find it alongside our module class.
     li: ({ children, className, ...props }) => {
       const isTask = className?.includes('task-list-item');
       return (
         <li
-          className={[styles.li, isTask ? styles.taskItem : ''].filter(Boolean).join(' ')}
+          className={[styles.li, isTask ? styles.taskItem : '', isTask ? 'task-list-item' : ''].filter(Boolean).join(' ')}
           {...props}
         >
           {children}
