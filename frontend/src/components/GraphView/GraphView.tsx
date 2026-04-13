@@ -328,7 +328,9 @@ export default function GraphView({ data, onNodeClick }: Props) {
       neighbors.get(tgt)!.add(src);
     }
 
-    const applyHighlight = (connected: Set<string> | null) => {
+    // hoveredId: only outgoing edges (hovered → neighbor) get labels shown.
+    // Incoming edges are still visible but unlabelled.
+    const applyHighlight = (connected: Set<string> | null, hoveredId: string | null = null) => {
       highlightRef.current = connected;
       node.attr('opacity', n => !connected || connected.has(n.id) ? 1 : 0.1);
       label.attr('opacity', n => !connected || connected.has(n.id) ? 1 : 0.1);
@@ -339,32 +341,21 @@ export default function GraphView({ data, onNodeClick }: Props) {
         return connected.has(src) && connected.has(tgt) ? 1 : 0.05;
       });
       linkLabel
-        // In highlight mode: show connected labels (override the toggle), hide others.
-        // When clearing: restore display to whatever the toggle says.
         .attr('display', e => {
-          if (connected) {
+          if (connected && hoveredId) {
+            // Only outgoing edges from the hovered node get a label
             const src = (e.source as GraphNode).id;
             const tgt = (e.target as GraphNode).id;
-            return connected.has(src) && connected.has(tgt) ? null : 'none';
+            return src === hoveredId && connected.has(tgt) ? null : 'none';
           }
           return showLinkLabelsRef.current ? null : 'none';
         })
-        .attr('opacity', e => {
-          if (!connected) return 1;
-          const src = (e.source as GraphNode).id;
-          const tgt = (e.target as GraphNode).id;
-          return connected.has(src) && connected.has(tgt) ? 1 : 0;
-        })
-        .attr('font-size', e => {
-          if (!connected) return 8;
-          const src = (e.source as GraphNode).id;
-          const tgt = (e.target as GraphNode).id;
-          return connected.has(src) && connected.has(tgt) ? 10 : 8;
-        })
+        .attr('opacity', 1)
+        .attr('font-size', 10)
         .text(e => {
           const src = (e.source as GraphNode).id;
           const tgt = (e.target as GraphNode).id;
-          if (!connected || !connected.has(src) || !connected.has(tgt)) return e.type;
+          if (!connected || !hoveredId || src !== hoveredId || !connected.has(tgt)) return e.type;
           const srcLabel = (e.source as GraphNode).label;
           const tgtLabel = (e.target as GraphNode).label;
           return `${srcLabel} --${e.type}--> ${tgtLabel}`;
@@ -383,7 +374,7 @@ export default function GraphView({ data, onNodeClick }: Props) {
       .on('mouseover', (event: MouseEvent, n: GraphNode) => {
         if (ctrlModeRef.current) {
           const connected = new Set<string>([n.id, ...(neighbors.get(n.id) ?? [])]);
-          applyHighlight(connected);
+          applyHighlight(connected, n.id);
         } else {
           void showTooltip(n.id, event.clientX, event.clientY, n.detailFile);
         }
