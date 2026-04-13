@@ -1,7 +1,18 @@
 import { useEffect, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import type { Components } from 'react-markdown';
 import { fetchFileContent, fetchTodoFiles, writeFileContent } from '../../hooks/useGraph';
 import styles from './TodoView.module.css';
+
+// Generate heading anchor slug matching GitHub/Obsidian convention
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
+}
 
 export default function TodoView() {
   const [files, setFiles] = useState<string[]>([]);
@@ -15,13 +26,13 @@ export default function TodoView() {
   const loadFiles = useCallback(async () => {
     const list = await fetchTodoFiles();
     setFiles(list);
-    // Auto-select current sprint or daily file
-    const today = new Date().toISOString().slice(0, 10);
-    const daily = list.find(f => f.includes(today));
-    const sprint = list.find(f => f.includes('current-sprint'));
-    const first = daily ?? sprint ?? list[0];
-    if (first && !selected) {
-      setSelected(first);
+    if (!selected) {
+      const today = new Date().toISOString().slice(0, 10);
+      const pick =
+        list.find(f => f.includes(today)) ??
+        list.find(f => f.includes('current-sprint')) ??
+        list[0];
+      if (pick) setSelected(pick);
     }
   }, [selected]);
 
@@ -35,33 +46,23 @@ export default function TodoView() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadFiles();
-  }, [loadFiles]);
+  useEffect(() => { void loadFiles(); }, [loadFiles]);
+  useEffect(() => { if (selected) void loadFile(selected); }, [selected, loadFile]);
 
-  useEffect(() => {
-    if (selected) void loadFile(selected);
-  }, [selected, loadFile]);
-
-  // SSE reload
   useEffect(() => {
     const es = new EventSource('/api/watch');
-    es.onmessage = () => {
-      if (selected) void loadFile(selected);
-    };
+    es.onmessage = () => { if (selected) void loadFile(selected); };
     return () => es.close();
   }, [selected, loadFile]);
 
-  const handleCheckboxToggle = useCallback(async (lineIndex: number) => {
-    const lines = content.split('\n');
-    const line = lines[lineIndex];
-    if (!line) return;
-    if (line.includes('- [x]') || line.includes('- [X]')) {
-      lines[lineIndex] = line.replace(/- \[[xX]\]/, '- [ ]');
-    } else {
-      lines[lineIndex] = line.replace('- [ ]', '- [x]');
-    }
-    const updated = lines.join('\n');
+  // Toggle the nth checkbox (0-indexed) in the source
+  const handleCheckboxToggle = useCallback(async (index: number) => {
+    let count = -1;
+    const updated = content.replace(/^(\s*[-*+] \[)([xX ])(\])/gm, (match, pre, state, post) => {
+      count++;
+      if (count !== index) return match;
+      return `${pre}${state === ' ' ? 'x' : ' '}${post}`;
+    });
     setContent(updated);
     setEditBuffer(updated);
     await writeFileContent(selected, updated, 'todo');
@@ -79,7 +80,6 @@ export default function TodoView() {
     search === '' || f.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Group files by top-level folder
   const grouped: Record<string, string[]> = {};
   for (const f of filteredFiles) {
     const parts = f.split('/');
@@ -87,6 +87,80 @@ export default function TodoView() {
     if (!grouped[group]) grouped[group] = [];
     grouped[group].push(f);
   }
+
+  // Count checkboxes seen so far during a single render pass
+  let checkboxCounter = -1;
+
+  const mdComponents: Components = {
+    // Headings — add id for ToC anchor links
+    h1: ({ children, ...props }) => {
+      const text = String(children);
+      return <h1 id={slugify(text)} {...props}>{children}</h1>;
+    },
+    h2: ({ children, ...props }) => {
+      const text = String(children);
+      return <h2 id={slugify(text)} {...props}>{children}</h2>;
+    },
+    h3: ({ children, ...props }) => {
+      const text = String(children);
+      return <h3 id={slugify(text)} {...props}>{children}</h3>;
+    },
+    h4: ({ children, ...props }) => {
+      const text = String(children);
+      return <h4 id={slugify(text)} {...props}>{children}</h4>;
+    },
+
+    // Intercept checkboxes rendered by remark-gfm
+    input: ({ type, checked, ...props }) => {
+      if (type === 'checkbox') {
+        checkboxCounter++;
+        const idx = checkboxCounter;
+        return (
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={() => void handleCheckboxToggle(idx)}
+            className={styles.checkbox}
+            {...props}
+          />
+        );
+      }
+      return <input type={type} checked={checked} {...props} />;
+    },
+
+    // Style task list items
+    li: ({ children, className, ...props }) => {
+      const isTask = className?.includes('task-list-item');
+      return (
+        <li
+          className={[styles.li, isTask ? styles.taskItem : ''].filter(Boolean).join(' ')}
+          {...props}
+        >
+          {children}
+        </li>
+      );
+    },
+
+    // Open links in new tab; ToC anchors scroll within the panel
+    a: ({ href, children, ...props }) => {
+      const isAnchor = href?.startsWith('#');
+      return (
+        <a
+          href={href}
+          target={isAnchor ? undefined : '_blank'}
+          rel={isAnchor ? undefined : 'noreferrer'}
+          onClick={isAnchor ? (e) => {
+            e.preventDefault();
+            const id = href!.slice(1);
+            document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+          } : undefined}
+          {...props}
+        >
+          {children}
+        </a>
+      );
+    },
+  };
 
   return (
     <div className={styles.container}>
@@ -147,57 +221,16 @@ export default function TodoView() {
             />
           ) : (
             <div className={styles.rendered}>
-              <InteractiveMarkdown content={content} onCheckboxToggle={handleCheckboxToggle} />
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={mdComponents}
+              >
+                {content}
+              </ReactMarkdown>
             </div>
           )}
         </div>
       </main>
-    </div>
-  );
-}
-
-function InteractiveMarkdown({
-  content,
-  onCheckboxToggle,
-}: {
-  content: string;
-  onCheckboxToggle: (lineIndex: number) => void;
-}) {
-  const lines = content.split('\n');
-
-  return (
-    <div>
-      {lines.map((line, i) => {
-        const isChecked = /^(\s*)- \[[xX]\]/.test(line);
-        const isUnchecked = /^(\s*)- \[ \]/.test(line);
-
-        if (isChecked || isUnchecked) {
-          const text = line.replace(/^(\s*)- \[[xX ]\]\s*/, '');
-          const indent = (line.match(/^(\s*)/)?.[1]?.length ?? 0);
-          return (
-            <div
-              key={i}
-              className={styles.checkboxLine}
-              style={{ paddingLeft: indent * 8 + 4 }}
-            >
-              <input
-                type="checkbox"
-                checked={isChecked}
-                onChange={() => onCheckboxToggle(i)}
-                className={styles.checkbox}
-              />
-              <span className={isChecked ? styles.checkedText : ''}>{text}</span>
-            </div>
-          );
-        }
-
-        // Render non-checkbox lines as markdown
-        return (
-          <ReactMarkdown key={i} components={{ p: ({ children }) => <p className={styles.mdParagraph}>{children}</p> }}>
-            {line}
-          </ReactMarkdown>
-        );
-      })}
     </div>
   );
 }
