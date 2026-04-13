@@ -229,25 +229,29 @@ export default function TodoView() {
           </div>
         </div>
 
-        <div className={styles.content}>
-          {editing ? (
+        <div className={editing ? styles.contentSplit : styles.content}>
+          {editing && (
             <textarea
               className={styles.editor}
               value={editBuffer}
               onChange={e => setEditBuffer(e.target.value)}
               spellCheck={false}
+              autoFocus
             />
-          ) : (
-            <div className={styles.rendered} onDoubleClick={() => setEditing(true)}>
-              <ReactMarkdown
-                remarkPlugins={[remarkFrontmatter, remarkGfm]}
-                rehypePlugins={[rehypeRaw]}
-                components={mdComponents}
-              >
-                {content}
-              </ReactMarkdown>
-            </div>
           )}
+          <div
+            className={styles.rendered}
+            onDoubleClick={() => !editing && setEditing(true)}
+            style={{ cursor: editing ? 'default' : 'text' }}
+          >
+            <ReactMarkdown
+              remarkPlugins={[remarkFrontmatter, remarkGfm]}
+              rehypePlugins={[rehypeRaw]}
+              components={mdComponents}
+            >
+              {editing ? editBuffer : content}
+            </ReactMarkdown>
+          </div>
         </div>
       </main>
     </div>
