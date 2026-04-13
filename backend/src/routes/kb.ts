@@ -61,9 +61,15 @@ export function kbRouter(kbsRoot: string, getActive: () => string, getExternals:
           if (seen.has(rel)) continue;
           seen.add(rel);
 
-          const raw = fs.readFileSync(full, 'utf8');
-          const parsed = matter(raw);
-          const fm = parsed.data as Record<string, unknown>;
+          let raw: string;
+          let fm: Record<string, unknown>;
+          try {
+            raw = fs.readFileSync(full, 'utf8');
+            fm = matter(raw).data as Record<string, unknown>;
+          } catch (err) {
+            console.warn(`Skipping ${rel}: failed to parse frontmatter (${(err as Error).message})`);
+            continue;
+          }
 
           // Extract links from <details> block
           const detailsMatch = raw.match(/<details>[\s\S]*?<\/details>/);
