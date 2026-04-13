@@ -6,12 +6,15 @@ import matter from 'gray-matter';
 export function kbRouter(kbsRoot: string, getActive: () => string): Router {
   const router = Router();
 
+  // active can be a plain name ("acme-corp") resolved under kbsRoot,
+  // or an absolute path ("/home/user/eng-kb") for pointing outside kbs/.
   function activeKbPath(): string {
-    return path.join(kbsRoot, getActive());
+    const active = getActive();
+    return path.isAbsolute(active) ? active : path.join(kbsRoot, active);
   }
 
   function activeTodoPath(): string {
-    return path.join(kbsRoot, getActive(), 'plugins', 'eng-todo');
+    return path.join(activeKbPath(), 'plugins', 'eng-todo');
   }
 
   // List available companies (KB switcher)

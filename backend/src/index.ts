@@ -86,7 +86,8 @@ wss.on('connection', (ws) => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const nodePty = require('node-pty') as typeof import('node-pty');
     const shell = process.env['SHELL'] || 'bash';
-    const kbCwd = path.join(KBS_ROOT, getActive());
+    const active = getActive();
+    const kbCwd = path.isAbsolute(active) ? active : path.join(KBS_ROOT, active);
     const startCwd = fs.existsSync(kbCwd) ? kbCwd : ROOT;
     pty = nodePty.spawn(shell, [], {
       name: 'xterm-256color',
