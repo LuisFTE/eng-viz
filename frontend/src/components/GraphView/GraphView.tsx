@@ -335,12 +335,27 @@ export default function GraphView({ data, onNodeClick }: Props) {
         const tgt = (e.target as GraphNode).id;
         return connected.has(src) && connected.has(tgt) ? 1 : 0.05;
       });
-      linkLabel.attr('opacity', e => {
-        if (!connected) return 1;
-        const src = (e.source as GraphNode).id;
-        const tgt = (e.target as GraphNode).id;
-        return connected.has(src) && connected.has(tgt) ? 1 : 0.05;
-      });
+      linkLabel
+        .attr('opacity', e => {
+          if (!connected) return 1;
+          const src = (e.source as GraphNode).id;
+          const tgt = (e.target as GraphNode).id;
+          return connected.has(src) && connected.has(tgt) ? 1 : 0;
+        })
+        .attr('font-size', e => {
+          if (!connected) return 8;
+          const src = (e.source as GraphNode).id;
+          const tgt = (e.target as GraphNode).id;
+          return connected.has(src) && connected.has(tgt) ? 10 : 8;
+        })
+        .text(e => {
+          const src = (e.source as GraphNode).id;
+          const tgt = (e.target as GraphNode).id;
+          if (!connected || !connected.has(src) || !connected.has(tgt)) return e.type;
+          const srcLabel = (e.source as GraphNode).label;
+          const tgtLabel = (e.target as GraphNode).label;
+          return `${srcLabel} --${e.type}--> ${tgtLabel}`;
+        });
     };
 
     const node = g.append('g')
@@ -411,16 +426,17 @@ export default function GraphView({ data, onNodeClick }: Props) {
         .attr('x2', e => (e.target as GraphNode).x ?? 0)
         .attr('y2', e => (e.target as GraphNode).y ?? 0);
 
+      const labelT = highlightRef.current ? 0.5 : 0.2;
       linkLabel
         .attr('x', e => {
           const sx = (e.source as GraphNode).x ?? 0;
           const tx = (e.target as GraphNode).x ?? 0;
-          return sx + (tx - sx) * 0.2;
+          return sx + (tx - sx) * labelT;
         })
         .attr('y', e => {
           const sy = (e.source as GraphNode).y ?? 0;
           const ty = (e.target as GraphNode).y ?? 0;
-          return sy + (ty - sy) * 0.2 - 4;
+          return sy + (ty - sy) * labelT - 4;
         });
 
       node.attr('cx', n => n.x ?? 0).attr('cy', n => n.y ?? 0);
