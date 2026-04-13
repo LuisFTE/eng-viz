@@ -6,7 +6,7 @@
   overflow: hidden;
 }
 
-/* ── Header ─────────────────────────────────────────────────────────────── */
+/* ── Header ───────────────────────────���──────────────��───────────────────── */
 
 .header {
   display: flex;
@@ -39,36 +39,20 @@
   gap: 10px;
 }
 
-.status {
-  font-size: 11px;
-  color: var(--text-muted);
-}
+.status { font-size: 11px; color: var(--text-muted); }
+.error  { font-size: 11px; color: var(--red); }
 
-.error {
-  font-size: 11px;
-  color: var(--red);
-}
-
-/* ── Workspace ───────────────────────────────────────────────────────────── */
+/* ── Workspace ──────────────────────────────────────────────────────────���── */
 
 .workspace {
   flex: 1;
   display: flex;
-  flex-direction: column;
   overflow: hidden;
   min-height: 0;
+  position: relative;
 }
 
-/* ── Main row ────────────────────────────────────────────────────────────── */
-
-.mainRow {
-  display: flex;
-  flex-direction: row;
-  overflow: hidden;
-  min-height: 0;
-}
-
-/* ── Individual panel ────────────────────────────────────────────────────── */
+/* ── Panel (leaf wrapper) ──────────────────────────────���─────────────────── */
 
 .panel {
   display: flex;
@@ -76,30 +60,199 @@
   overflow: hidden;
   min-width: 0;
   min-height: 0;
+  flex: 1;
   position: relative;
 }
 
-.termPanel {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-height: 0;
-  flex-shrink: 0;
-}
+/* ── Panel label bar ─────────────────────────────────────────────────────── */
 
 .panelLabel {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  padding: 3px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 6px 3px 8px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   user-select: none;
+  gap: 6px;
+  cursor: grab;
+}
+.panelLabel:active { cursor: grabbing; }
+
+.panelLabelDragging { opacity: 0.4; }
+
+.dragHandle {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.5;
+  flex-shrink: 0;
 }
 
-/* ── Dividers ────────────────────────────────────────────────────────────── */
+.panelDropTarget {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.panelLabelName {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.panelLabelActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Split button + popover ─────────────────────────────────────────────────── */
+
+.splitBtnWrap {
+  position: relative;
+}
+
+.splitBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.splitBtn:hover { color: var(--text); background: var(--surface2); }
+
+.splitPopover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 200;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.splitRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.splitDirLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 54px;
+  flex-shrink: 0;
+}
+
+.splitPopover button {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+/* Close panel button ───────────────────────────────���─────────────────────── */
+
+.closePanelBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.closePanelBtn:hover { color: var(--red, #e05c5c); background: var(--surface2); }
+
+/* ── Empty panel ─────────────────────────────────────────────────────────── */
+
+.emptyPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.emptyPanelBtns {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── Graph inner (graph + optional KB detail) ───────────────���────────────── */
+
+.graphInner {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Drag state ─────────────────────────────────────────────────────────── */
+
+.panelDragging { opacity: 0.5; }
+
+/* Drop zone overlay (covers full panel, pointer-events enabled during drag) */
+.dropOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+}
+
+/* Directional zone indicator — a translucent strip on the relevant side */
+.zoneIndicator {
+  position: absolute;
+  background: var(--accent);
+  opacity: 0.3;
+  border: 2px solid var(--accent);
+  pointer-events: none;
+}
+.zone_top    { inset: 0 0 60% 0; }
+.zone_bottom { inset: 60% 0 0 0; }
+.zone_left   { inset: 0 60% 0 0; }
+.zone_right  { inset: 0 0 0 60%; }
+
+/* Full-width bottom dock strip */
+.dockZone {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  background: var(--surface2);
+  border-top: 2px dashed var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  z-index: 60;
+  cursor: copy;
+}
+.dockZoneActive {
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface2));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Resize dividers ──────────────────────────────────────────────────────── */
 
 .hDivider {
   width: 4px;
@@ -110,11 +263,7 @@
   position: relative;
   z-index: 10;
 }
-
-.hDivider:hover,
-.hDivider:active {
-  background: var(--accent);
-}
+.hDivider:hover, .hDivider:active { background: var(--accent); }
 
 .vDivider {
   height: 4px;
@@ -125,8 +274,4 @@
   position: relative;
   z-index: 10;
 }
-
-.vDivider:hover,
-.vDivider:active {
-  background: var(--accent);
-}
+.vDivider:hover, .vDivider:active { background: var(--accent); }

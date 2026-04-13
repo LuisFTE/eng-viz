@@ -28,16 +28,16 @@ npm run install:all
 ### 2. Link your KBs
 
 ```bash
-mkdir -p kbs/bloomberg
-ln -s /path/to/eng-kb kbs/bloomberg/eng-kb
-ln -s /path/to/eng-todo kbs/bloomberg/eng-todo
+mkdir -p kbs/sample-kb
+ln -s /path/to/eng-kb kbs/sample-kb/eng-kb
+ln -s /path/to/eng-todo kbs/sample-kb/eng-todo
 ```
 
 ### 3. Set active company
 
 Edit `config.json`:
 ```json
-{ "active": "bloomberg" }
+{ "active": "sample-kb" }
 ```
 
 ### 4. Run

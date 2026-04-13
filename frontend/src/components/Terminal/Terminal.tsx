@@ -5,11 +5,16 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import styles from './Terminal.module.css';
 
-export default function Terminal() {
+interface Props {
+  kbPath?: string;
+}
+
+export default function Terminal({ kbPath }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const mountedKbPath = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -81,12 +86,29 @@ export default function Terminal() {
     });
     ro.observe(el);
 
+    // Record the path the terminal was spawned with so the cd effect can skip the first value
+    mountedKbPath.current = kbPath;
+
     return () => {
       ro.disconnect();
       ws.close();
       term.dispose();
     };
+  // kbPath intentionally omitted — terminal spawns once; path changes are handled below
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // If the active KB changes while the terminal is open, cd into the new path
+  useEffect(() => {
+    if (!kbPath) return;
+    // Skip the initial value — the pty already starts in the right dir
+    if (kbPath === mountedKbPath.current) return;
+    mountedKbPath.current = kbPath;
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'data', data: `cd ${JSON.stringify(kbPath)}\r` }));
+    }
+  }, [kbPath]);
 
   return (
     <div className={styles.container}>

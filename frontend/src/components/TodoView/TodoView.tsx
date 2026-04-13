@@ -19,18 +19,17 @@ export default function TodoView() {
   const [editBuffer, setEditBuffer] = useState('');
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const suppressNextReload = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const renderedRef = useRef<HTMLDivElement>(null);
   // Refs used by useLayoutEffect to avoid stale closures
-  const savedScrollRef = useRef(0);
+  const savedScrollFracRef = useRef(0);
   const initialCursorRef = useRef<string | undefined>(undefined);
   const editBufferRef = useRef('');
   editBufferRef.current = editBuffer;
-  // editingRef lets auto-resize useEffect guard without editing in its deps
-  const editingRef = useRef(false);
-  editingRef.current = editing;
   // Stable ref to selected so loadFiles doesn't re-run on every file switch
   const selectedRef = useRef('');
   selectedRef.current = selected;
@@ -108,22 +107,25 @@ export default function TodoView() {
     return () => window.removeEventListener('keydown', handler);
   }, [editing, handleSave, handleCancel]);
 
-  // Capture scroll + cursor target before entering edit, then set state
+  // Capture scroll position as a 0–1 fraction before entering edit, then set state.
+  // Fraction-based mapping lets us translate position across two differently-sized scroll containers.
   const enterEdit = useCallback((cursorSearch?: string) => {
-    savedScrollRef.current = contentRef.current?.scrollTop ?? 0;
+    const el = renderedRef.current;
+    const max = el ? Math.max(1, el.scrollHeight - el.clientHeight) : 1;
+    savedScrollFracRef.current = el ? el.scrollTop / max : 0;
     initialCursorRef.current = cursorSearch;
     setEditBuffer(content);
     setEditing(true);
   }, [content]);
 
-  // On entering edit: resize + restore scroll + focus, all before paint.
+  // On entering edit: restore scroll + focus before paint.
+  // No height manipulation — textarea uses height: 100% and scrolls itself.
   useLayoutEffect(() => {
     if (!editing) return;
     const ta = textareaRef.current;
     if (!ta) return;
-    ta.style.height = 'auto';
-    ta.style.height = `${ta.scrollHeight}px`;
-    if (contentRef.current) contentRef.current.scrollTop = savedScrollRef.current;
+    const max = Math.max(0, ta.scrollHeight - ta.clientHeight);
+    ta.scrollTop = savedScrollFracRef.current * max;
     ta.focus();
     const search = initialCursorRef.current;
     if (search) {
@@ -133,20 +135,6 @@ export default function TodoView() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
-
-  // Auto-resize on keystrokes. `editing` intentionally omitted from deps —
-  // keeping it out means this effect never fires on the mode switch itself,
-  // so it can't clobber the scroll restoration done by the useLayoutEffect above.
-  // editingRef is used as a guard instead.
-  useEffect(() => {
-    const ta = textareaRef.current;
-    if (!ta || !editingRef.current) return;
-    const prevScroll = contentRef.current?.scrollTop ?? 0;
-    ta.style.height = 'auto';
-    ta.style.height = `${ta.scrollHeight}px`;
-    if (contentRef.current) contentRef.current.scrollTop = prevScroll;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editBuffer]);
 
   // ── Checkbox toggle ──────────────────────────────────────────────────────
 
@@ -252,36 +240,47 @@ export default function TodoView() {
 
   return (
     <div className={styles.container}>
-      <aside className={styles.sidebar}>
+      <aside className={`${styles.sidebar} ${sidebarOpen ? '' : styles.sidebarCollapsed}`}>
         <div className={styles.sidebarHeader}>
-          <input
-            type="text"
-            placeholder="Filter files…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+          {sidebarOpen && (
+            <input
+              type="text"
+              placeholder="Filter files…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          )}
+          <button
+            className={styles.sidebarToggle}
+            onClick={() => setSidebarOpen(v => !v)}
+            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          >
+            {sidebarOpen ? '‹' : '›'}
+          </button>
         </div>
-        <nav className={styles.fileTree}>
-          {Object.entries(grouped).map(([group, groupFiles]) => (
-            <div key={group} className={styles.group}>
-              <div className={styles.groupLabel}>{group}</div>
-              {groupFiles.map(f => {
-                const parts = f.split('/');
-                const name = parts[parts.length - 1] ?? f;
-                return (
-                  <button
-                    key={f}
-                    className={`${styles.fileItem} ${selected === f ? styles.fileItemActive : ''}`}
-                    onClick={() => setSelected(f)}
-                    title={f}
-                  >
-                    {name}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
+        {sidebarOpen && (
+          <nav className={styles.fileTree}>
+            {Object.entries(grouped).map(([group, groupFiles]) => (
+              <div key={group} className={styles.group}>
+                <div className={styles.groupLabel}>{group}</div>
+                {groupFiles.map(f => {
+                  const parts = f.split('/');
+                  const name = parts[parts.length - 1] ?? f;
+                  return (
+                    <button
+                      key={f}
+                      className={`${styles.fileItem} ${selected === f ? styles.fileItemActive : ''}`}
+                      onClick={() => setSelected(f)}
+                      title={f}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+        )}
       </aside>
 
       <main className={styles.main}>
@@ -314,6 +313,7 @@ export default function TodoView() {
             />
           ) : (
             <div
+              ref={renderedRef}
               className={styles.rendered}
               onDoubleClick={() => {
                 const sel = window.getSelection()?.toString();

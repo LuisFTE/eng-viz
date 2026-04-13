@@ -1,0 +1,95 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: 6px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.filePath {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.closeBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.closeBtn:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.loading {
+  display: block;
+  padding: 28px 36px;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 12px;
+}
+
+/* ── Rendered markdown (mirrors TodoView styles) ────────────────────────── */
+
+.rendered {
+  padding: 28px 36px;
+  max-width: 780px;
+  line-height: 1.75;
+  color: var(--text);
+}
+
+.rendered :global(h1) { font-size: 22px; font-weight: 700; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.rendered :global(h2) { font-size: 17px; font-weight: 600; margin: 28px 0 10px; padding-bottom: 5px; border-bottom: 1px solid var(--border); }
+.rendered :global(h3) { font-size: 14px; font-weight: 600; margin: 20px 0 6px; color: var(--text-muted); }
+.rendered :global(h4) { font-size: 13px; font-weight: 600; margin: 16px 0 4px; color: var(--text-muted); }
+.rendered :global(p)  { margin: 8px 0; }
+
+.rendered :global(a) { color: var(--accent2); text-decoration: none; }
+.rendered :global(a:hover) { text-decoration: underline; }
+
+.rendered :global(code) { background: var(--surface2); border: 1px solid var(--border); padding: 1px 6px; border-radius: 3px; font-size: 12px; color: var(--accent2); }
+.rendered :global(pre)  { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; overflow-x: auto; margin: 12px 0; }
+.rendered :global(pre code) { background: none; border: none; padding: 0; color: var(--text); font-size: 12px; }
+
+.rendered :global(blockquote) { border-left: 3px solid var(--accent); padding: 2px 0 2px 14px; margin: 12px 0; color: var(--text-muted); }
+.rendered :global(hr) { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+.rendered :global(table) { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 12px; }
+.rendered :global(th), .rendered :global(td) { border: 1px solid var(--border); padding: 7px 12px; text-align: left; }
+.rendered :global(th) { background: var(--surface2); color: var(--text-muted); font-weight: 600; }
+.rendered :global(tr:nth-child(even)) { background: rgba(255,255,255,0.02); }
+
+.rendered :global(ul), .rendered :global(ol) { padding-left: 22px; margin: 6px 0; }
+.rendered :global(ul ul), .rendered :global(ol ol) { margin: 2px 0; }
+
+.rendered :global(details) { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; margin: 12px 0; overflow: hidden; }
+.rendered :global(summary) { cursor: pointer; padding: 8px 12px; font-size: 12px; color: var(--text-muted); user-select: none; list-style: none; }
+.rendered :global(summary::-webkit-details-marker) { display: none; }
+.rendered :global(summary::before) { content: '▶ '; font-size: 10px; display: inline-block; transition: transform 0.15s; }
+.rendered :global(details[open] summary::before) { transform: rotate(90deg); }
+.rendered :global(details[open] summary) { border-bottom: 1px solid var(--border); color: var(--text); }
+.rendered :global(details > *:not(summary)) { padding: 10px 14px; font-size: 12px; }

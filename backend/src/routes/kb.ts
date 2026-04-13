@@ -27,9 +27,13 @@ export function kbRouter(kbsRoot: string, getActive: () => string): Router {
     res.json(companies);
   });
 
-  // Get active company
+  // Get active company + its KB path + whether todo exists
   router.get('/active', (_req: Request, res: Response) => {
-    res.json({ active: getActive() });
+    res.json({
+      active: getActive(),
+      path: activeKbPath(),
+      hasTodo: fs.existsSync(activeTodoPath()),
+    });
   });
 
   // Walk _*.md files and build graph

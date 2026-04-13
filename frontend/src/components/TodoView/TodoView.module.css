@@ -15,15 +15,36 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.15s ease;
+}
+
+.sidebarCollapsed {
+  width: 32px;
 }
 
 .sidebarHeader {
-  padding: 8px;
+  padding: 6px 8px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.sidebarHeader input { width: 100%; }
+.sidebarHeader input { flex: 1; min-width: 0; }
+
+.sidebarToggle {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  line-height: 1;
+  border-radius: 3px;
+}
+.sidebarToggle:hover { color: var(--text); background: var(--surface2); }
 
 .fileTree {
   flex: 1;
@@ -107,7 +128,7 @@
 
 .content {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -116,6 +137,7 @@
 
 .rendered {
   flex: 1;
+  overflow-y: auto;
   padding: 28px 36px;
   max-width: 780px;
   line-height: 1.75;
@@ -188,7 +210,7 @@
 
 .editor {
   width: 100%;
-  /* No min-height: 100% — lets the parent div measure true scroll height */
+  height: 100%;
   background: var(--surface2);
   color: var(--text);
   border: none;
@@ -198,8 +220,7 @@
   line-height: 1.75;
   resize: none;
   outline: none;
-  /* overflow-y: hidden prevents textarea's own scrollbar; parent div scrolls */
-  overflow-y: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
 }
 
