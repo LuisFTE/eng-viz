@@ -98,6 +98,16 @@ export default function GraphView({ data, onNodeClick }: Props) {
     return filteredNodeIds.has(src) && filteredNodeIds.has(tgt);
   });
 
+  // Stable keys that capture actual data identity, not just count.
+  // Using these in the d3 effect dep array means the graph redraws whenever
+  // node/edge identity changes, not just when the count happens to differ.
+  const nodeKey = filteredNodes.map(n => n.id).join('\0');
+  const edgeKey = filteredEdges.map(e => {
+    const s = typeof e.source === 'string' ? e.source : (e.source as GraphNode).id;
+    const t = typeof e.target === 'string' ? e.target : (e.target as GraphNode).id;
+    return `${s}→${t}`;
+  }).join('\0');
+
   // ── Filter helpers ────────────────────────────────────────────────────────
   const resetFilters = () => {
     setHiddenTypes(new Set());
@@ -302,8 +312,7 @@ export default function GraphView({ data, onNodeClick }: Props) {
     }
 
     return () => { sim.stop(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredNodes.length, filteredEdges.length, search, onlyType, hiddenTypes, pipelineFilter, pipelineOnly, onNodeClick]);
+  }, [nodeKey, edgeKey, search, onNodeClick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isFiltered = onlyType !== null || hiddenTypes.size > 0 || pipelineFilter !== null || pipelineOnly;
 
