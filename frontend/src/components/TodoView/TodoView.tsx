@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import type { Components } from 'react-markdown';
 import { fetchFileContent, fetchTodoFiles, writeFileContent } from '../../hooks/useGraph';
 import styles from './TodoView.module.css';
@@ -110,8 +111,11 @@ export default function TodoView() {
       return <h4 id={slugify(text)} {...props}>{children}</h4>;
     },
 
-    // Intercept checkboxes rendered by remark-gfm
-    input: ({ type, checked, ...props }) => {
+    // Intercept checkboxes rendered by remark-gfm.
+    // Destructure `disabled` out so it never reaches the DOM element —
+    // remark-gfm always passes disabled={true} which would block clicks.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    input: ({ type, checked, disabled: _disabled, ...props }) => {
       if (type === 'checkbox') {
         checkboxCounter++;
         const idx = checkboxCounter;
@@ -223,6 +227,7 @@ export default function TodoView() {
             <div className={styles.rendered}>
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw]}
                 components={mdComponents}
               >
                 {content}
