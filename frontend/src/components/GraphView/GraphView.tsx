@@ -127,7 +127,8 @@ export default function GraphView({ data, onNodeClick }: Props) {
   const onNodeClickRef = useRef(onNodeClick);
   useEffect(() => { onNodeClickRef.current = onNodeClick; }, [onNodeClick]);
 
-  // Highlight state — shift+hover dims everything except hovered node's neighbors
+  // Ctrl = highlight mode: hover shows neighbors, suppresses tooltip
+  const ctrlModeRef = useRef(false);
   const highlightRef = useRef<Set<string> | null>(null);
 
   const [search, setSearch] = useState('');
@@ -352,18 +353,22 @@ export default function GraphView({ data, onNodeClick }: Props) {
       .attr('stroke-width', 2)
       .style('cursor', 'grab')
       .on('mouseover', (event: MouseEvent, n: GraphNode) => {
-        void showTooltip(n.id, event.clientX, event.clientY, n.detailFile);
-        if (event.ctrlKey) {
+        if (ctrlModeRef.current) {
           const connected = new Set<string>([n.id, ...(neighbors.get(n.id) ?? [])]);
           applyHighlight(connected);
+        } else {
+          void showTooltip(n.id, event.clientX, event.clientY, n.detailFile);
         }
       })
       .on('mousemove', (event: MouseEvent) => {
-        setTooltipPos({ x: event.clientX, y: event.clientY });
+        if (!ctrlModeRef.current) setTooltipPos({ x: event.clientX, y: event.clientY });
       })
       .on('mouseout', () => {
-        hideTooltip();
-        if (highlightRef.current) applyHighlight(null);
+        if (ctrlModeRef.current) {
+          applyHighlight(null);
+        } else {
+          hideTooltip();
+        }
       })
       .on('click', (_event: MouseEvent, n: GraphNode) => {
         if (onNodeClickRef.current && n.detailFile) onNodeClickRef.current(n.detailFile);
@@ -429,8 +434,23 @@ export default function GraphView({ data, onNodeClick }: Props) {
       }
     });
 
+    // Ctrl held = highlight mode; release = clear highlight and resume tooltips
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Control') ctrlModeRef.current = true;
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control') {
+        ctrlModeRef.current = false;
+        applyHighlight(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+
     return () => {
       sim.stop();
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
       nodeSelRef.current = null;
       linkSelRef.current = null;
       nodeLabelRef.current = null;
