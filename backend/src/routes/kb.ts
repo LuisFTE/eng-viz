@@ -71,16 +71,12 @@ export function kbRouter(kbsRoot: string, getActive: () => string, getExternals:
             continue;
           }
 
-          // Extract links from <details> block
-          const detailsMatch = raw.match(/<details>[\s\S]*?<\/details>/);
+          // Extract links from ## Links section
+          // Format: - [[path/_node]] (type) -- reason
           const links: ParsedLink[] = [];
-
-          if (detailsMatch) {
-            const block = detailsMatch[0];
-            const linkMatches = block.matchAll(/- target: "?\[\[([^\]]+)\]\]"?\s*\n\s*type: ([^\n]+)\s*\n\s*reason: "?([^"\n]+)"?/g);
-            for (const m of linkMatches) {
-              links.push({ target: m[1].trim(), type: m[2].trim(), reason: m[3].trim() });
-            }
+          const linkMatches = raw.matchAll(/- \[\[([^\]]+)\]\]\s*\(([^)]+)\)(?:\s*--\s*(.+))?/g);
+          for (const m of linkMatches) {
+            links.push({ target: m[1].trim(), type: m[2].trim(), reason: (m[3] || '').trim() });
           }
 
           // Determine detail file path
@@ -122,7 +118,10 @@ export function kbRouter(kbsRoot: string, getActive: () => string, getExternals:
     }
 
     walk(kbPath);
-    res.json({ nodes, edges });
+    // Drop edges that reference nodes not in the graph
+    const nodeIds = new Set(nodes.map(n => n.id));
+    const validEdges = edges.filter(e => nodeIds.has(e.source) && nodeIds.has(e.target));
+    res.json({ nodes, edges: validEdges });
   });
 
   // Get file content (for hover / todo view)

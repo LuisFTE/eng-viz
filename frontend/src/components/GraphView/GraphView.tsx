@@ -45,6 +45,37 @@ function nodeColor(type: string): string {
   return NODE_COLORS[type.toLowerCase()] ?? 'var(--node-unknown)';
 }
 
+/** Smoothly fit the viewport around the given nodes. */
+function fitView(
+  svg: SVGSVGElement,
+  zoom: d3.ZoomBehavior<SVGSVGElement, unknown>,
+  nodes: GraphNode[],
+  duration = 500,
+) {
+  const visible = nodes.filter(n => n.x != null && n.y != null);
+  if (visible.length === 0) return;
+
+  const pad = 60;
+  const xs = visible.map(n => n.x!);
+  const ys = visible.map(n => n.y!);
+  const x0 = Math.min(...xs) - pad;
+  const y0 = Math.min(...ys) - pad;
+  const x1 = Math.max(...xs) + pad;
+  const y1 = Math.max(...ys) + pad;
+
+  const rect = svg.getBoundingClientRect();
+  const w = rect.width || 900;
+  const h = rect.height || 600;
+  const scale = Math.min(w / (x1 - x0), h / (y1 - y0), 1.5);
+  const tx = w / 2 - scale * (x0 + x1) / 2;
+  const ty = h / 2 - scale * (y0 + y1) / 2;
+
+  d3.select(svg)
+    .transition()
+    .duration(duration)
+    .call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+}
+
 interface TooltipContent {
   content: string;
   loading: boolean;
@@ -83,6 +114,7 @@ type TextSel<D> = d3.Selection<SVGTextElement, D, SVGGElement, unknown>;
 export default function GraphView({ data, onNodeClick }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const simRef = useRef<d3.Simulation<GraphNode, GraphEdge> | null>(null);
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
 
   // D3 selections kept across renders so the visibility effect can update
   // them without rebuilding the simulation.
@@ -94,6 +126,9 @@ export default function GraphView({ data, onNodeClick }: Props) {
   // Stable ref so the simulation effect doesn't re-run when onNodeClick changes.
   const onNodeClickRef = useRef(onNodeClick);
   useEffect(() => { onNodeClickRef.current = onNodeClick; }, [onNodeClick]);
+
+  // Highlight state — shift+hover dims everything except hovered node's neighbors
+  const highlightRef = useRef<Set<string> | null>(null);
 
   const [search, setSearch] = useState('');
   const [toolbarOpen, setToolbarOpen] = useState(true);
@@ -215,16 +250,19 @@ export default function GraphView({ data, onNodeClick }: Props) {
 
     d3.select(svg).selectAll('*').remove();
 
-    const root = d3.select(svg).attr('width', width).attr('height', height);
+    const root = d3.select(svg)
+      .attr('width', '100%')
+      .attr('height', '100%')
+      .attr('viewBox', `0 0 ${width} ${height}`);
     const g = root.append('g');
 
-    root.call(
-      d3.zoom<SVGSVGElement, unknown>()
-        .scaleExtent([0.1, 4])
-        .on('zoom', (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
-          g.attr('transform', String(event.transform));
-        })
-    );
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 4])
+      .on('zoom', (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
+        g.attr('transform', String(event.transform));
+      });
+    root.call(zoom);
+    zoomRef.current = zoom;
 
     const defs = root.append('defs');
     defs.append('marker')
@@ -249,10 +287,10 @@ export default function GraphView({ data, onNodeClick }: Props) {
     }));
 
     const sim = d3.forceSimulation<GraphNode>(nodes)
-      .force('link', d3.forceLink<GraphNode, GraphEdge>(edges).id(n => n.id).distance(120))
-      .force('charge', d3.forceManyBody().strength(-300))
+      .force('link', d3.forceLink<GraphNode, GraphEdge>(edges).id(n => n.id).distance(100))
+      .force('charge', d3.forceManyBody().strength(-250).distanceMax(400))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide(28));
+      .force('collision', d3.forceCollide(40));
 
     simRef.current = sim;
 
@@ -275,6 +313,35 @@ export default function GraphView({ data, onNodeClick }: Props) {
       .text(e => e.type);
     linkLabelRef.current = linkLabel;
 
+    // Build adjacency map for shift+hover highlight
+    const neighbors = new Map<string, Set<string>>();
+    for (const e of edges) {
+      const src = typeof e.source === 'string' ? e.source : (e.source as GraphNode).id;
+      const tgt = typeof e.target === 'string' ? e.target : (e.target as GraphNode).id;
+      if (!neighbors.has(src)) neighbors.set(src, new Set());
+      if (!neighbors.has(tgt)) neighbors.set(tgt, new Set());
+      neighbors.get(src)!.add(tgt);
+      neighbors.get(tgt)!.add(src);
+    }
+
+    const applyHighlight = (connected: Set<string> | null) => {
+      highlightRef.current = connected;
+      node.attr('opacity', n => !connected || connected.has(n.id) ? 1 : 0.1);
+      label.attr('opacity', n => !connected || connected.has(n.id) ? 1 : 0.1);
+      link.attr('opacity', e => {
+        if (!connected) return 1;
+        const src = (e.source as GraphNode).id;
+        const tgt = (e.target as GraphNode).id;
+        return connected.has(src) && connected.has(tgt) ? 1 : 0.05;
+      });
+      linkLabel.attr('opacity', e => {
+        if (!connected) return 1;
+        const src = (e.source as GraphNode).id;
+        const tgt = (e.target as GraphNode).id;
+        return connected.has(src) && connected.has(tgt) ? 1 : 0.05;
+      });
+    };
+
     const node = g.append('g')
       .selectAll<SVGCircleElement, GraphNode>('circle')
       .data(nodes)
@@ -286,11 +353,18 @@ export default function GraphView({ data, onNodeClick }: Props) {
       .style('cursor', 'grab')
       .on('mouseover', (event: MouseEvent, n: GraphNode) => {
         void showTooltip(n.id, event.clientX, event.clientY, n.detailFile);
+        if (event.shiftKey) {
+          const connected = new Set<string>([n.id, ...(neighbors.get(n.id) ?? [])]);
+          applyHighlight(connected);
+        }
       })
       .on('mousemove', (event: MouseEvent) => {
         setTooltipPos({ x: event.clientX, y: event.clientY });
       })
-      .on('mouseout', hideTooltip)
+      .on('mouseout', () => {
+        hideTooltip();
+        if (highlightRef.current) applyHighlight(null);
+      })
       .on('click', (_event: MouseEvent, n: GraphNode) => {
         if (onNodeClickRef.current && n.detailFile) onNodeClickRef.current(n.detailFile);
       })
@@ -348,12 +422,20 @@ export default function GraphView({ data, onNodeClick }: Props) {
       label.attr('x', n => n.x ?? 0).attr('y', n => n.y ?? 0);
     });
 
+    // Auto-fit once the simulation has cooled enough for stable positions
+    sim.on('end', () => {
+      if (svgRef.current && zoomRef.current) {
+        fitView(svgRef.current, zoomRef.current, nodes);
+      }
+    });
+
     return () => {
       sim.stop();
       nodeSelRef.current = null;
       linkSelRef.current = null;
       nodeLabelRef.current = null;
       linkLabelRef.current = null;
+      zoomRef.current = null;
     };
   }, [data, showTooltip, hideTooltip]); // filter state intentionally excluded
 
@@ -386,6 +468,9 @@ export default function GraphView({ data, onNodeClick }: Props) {
 
     linkSel.attr('display', (e: GraphEdge) => edgeVisible(e) ? null : 'none');
     linkLabelRef.current?.attr('display', (e: GraphEdge) => edgeVisible(e) ? null : 'none');
+
+    // Reheat so nodes re-arrange around the new visible set
+    simRef.current?.alpha(0.3).restart();
   }, [nodeKey, search]); // eslint-disable-line react-hooks/exhaustive-deps
   // nodeKey changes whenever filteredNodeIds changes, so filteredNodeIds in
   // the closure above is always current when this effect fires.
