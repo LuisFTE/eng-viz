@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkFrontmatter from 'remark-frontmatter';
 import rehypeRaw from 'rehype-raw';
 import type { Components } from 'react-markdown';
 import { fetchFileContent, fetchTodoFiles, writeFileContent } from '../../hooks/useGraph';
@@ -64,16 +65,6 @@ export default function TodoView() {
     return () => es.close();
   }, [selected, loadFile]);
 
-  // Pre-compute the line index of every checkbox in the current content.
-  // This is the source of truth for which line each rendered checkbox maps to,
-  // decoupling toggle logic from render order entirely.
-  const checkboxLineIndices = useMemo(() => {
-    return content.split('\n').reduce<number[]>((acc, line, i) => {
-      if (/^\s*[-*+] \[[xX ]\]/.test(line)) acc.push(i);
-      return acc;
-    }, []);
-  }, [content]);
-
   // Toggle the checkbox at a specific line index in the source
   const handleCheckboxToggle = useCallback(async (lineIndex: number) => {
     const lines = content.split('\n');
@@ -112,9 +103,6 @@ export default function TodoView() {
     grouped[group].push(f);
   }
 
-  // Render-time counter: maps the nth rendered checkbox to its source line index
-  let checkboxRenderCount = -1;
-
   const mdComponents: Components = {
     // Headings — add id for ToC anchor links
     h1: ({ children, ...props }) => {
@@ -135,15 +123,15 @@ export default function TodoView() {
     },
 
     // Intercept checkboxes rendered by remark-gfm.
-    // Destructure `disabled` out so it never reaches the DOM element —
-    // remark-gfm always passes disabled={true} which would block clicks.
-    // Use the pre-computed line index map so toggling is independent of
-    // render order (avoids off-by-one if non-checkbox inputs exist).
+    // remark-rehype copies the mdast listItem's source position onto the
+    // synthesized input element, so node.position.start.line is the exact
+    // 1-indexed source line — no counters, no index mapping needed.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    input: ({ type, checked, disabled: _disabled, ...props }) => {
+    input: ({ type, checked, disabled: _disabled, node, ...props }) => {
       if (type === 'checkbox') {
-        checkboxRenderCount++;
-        const lineIndex = checkboxLineIndices[checkboxRenderCount];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sourceLine: number | undefined = (node as any)?.position?.start?.line;
+        const lineIndex = sourceLine !== undefined ? sourceLine - 1 : undefined;
         return (
           <input
             type="checkbox"
@@ -252,7 +240,7 @@ export default function TodoView() {
           ) : (
             <div className={styles.rendered}>
               <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
+                remarkPlugins={[remarkFrontmatter, remarkGfm]}
                 rehypePlugins={[rehypeRaw]}
                 components={mdComponents}
               >
