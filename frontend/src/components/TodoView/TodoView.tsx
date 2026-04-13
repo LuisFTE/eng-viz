@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -64,14 +64,26 @@ export default function TodoView() {
     return () => es.close();
   }, [selected, loadFile]);
 
-  // Toggle the nth checkbox (0-indexed) in the source
-  const handleCheckboxToggle = useCallback(async (index: number) => {
-    let count = -1;
-    const updated = content.replace(/^(\s*[-*+] \[)([xX ])(\])/gm, (match, pre, state, post) => {
-      count++;
-      if (count !== index) return match;
-      return `${pre}${state === ' ' ? 'x' : ' '}${post}`;
-    });
+  // Pre-compute the line index of every checkbox in the current content.
+  // This is the source of truth for which line each rendered checkbox maps to,
+  // decoupling toggle logic from render order entirely.
+  const checkboxLineIndices = useMemo(() => {
+    return content.split('\n').reduce<number[]>((acc, line, i) => {
+      if (/^\s*[-*+] \[[xX ]\]/.test(line)) acc.push(i);
+      return acc;
+    }, []);
+  }, [content]);
+
+  // Toggle the checkbox at a specific line index in the source
+  const handleCheckboxToggle = useCallback(async (lineIndex: number) => {
+    const lines = content.split('\n');
+    const line = lines[lineIndex];
+    if (line === undefined) return;
+    lines[lineIndex] = line.replace(
+      /^(\s*[-*+] \[)([xX ])(\])/,
+      (_, pre, state, post) => `${pre}${state === ' ' ? 'x' : ' '}${post}`
+    );
+    const updated = lines.join('\n');
     // Update state immediately so UI responds without waiting for the write
     setContent(updated);
     setEditBuffer(updated);
@@ -100,8 +112,8 @@ export default function TodoView() {
     grouped[group].push(f);
   }
 
-  // Count checkboxes seen so far during a single render pass
-  let checkboxCounter = -1;
+  // Render-time counter: maps the nth rendered checkbox to its source line index
+  let checkboxRenderCount = -1;
 
   const mdComponents: Components = {
     // Headings — add id for ToC anchor links
@@ -125,16 +137,18 @@ export default function TodoView() {
     // Intercept checkboxes rendered by remark-gfm.
     // Destructure `disabled` out so it never reaches the DOM element —
     // remark-gfm always passes disabled={true} which would block clicks.
+    // Use the pre-computed line index map so toggling is independent of
+    // render order (avoids off-by-one if non-checkbox inputs exist).
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     input: ({ type, checked, disabled: _disabled, ...props }) => {
       if (type === 'checkbox') {
-        checkboxCounter++;
-        const idx = checkboxCounter;
+        checkboxRenderCount++;
+        const lineIndex = checkboxLineIndices[checkboxRenderCount];
         return (
           <input
             type="checkbox"
             checked={checked}
-            onChange={() => void handleCheckboxToggle(idx)}
+            onChange={() => lineIndex !== undefined && void handleCheckboxToggle(lineIndex)}
             className={styles.checkbox}
             {...props}
           />
