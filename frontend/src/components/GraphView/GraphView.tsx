@@ -49,6 +49,7 @@ interface TooltipContent {
   content: string;
   loading: boolean;
   nodeId: string;
+  detailFile: string | null;
 }
 
 interface TooltipPos {
@@ -184,16 +185,16 @@ export default function GraphView({ data, onNodeClick }: Props) {
   const showTooltip = useCallback(async (nodeId: string, x: number, y: number, detailFile: string | null) => {
     if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
     setTooltipPos({ x, y });
-    setTooltipContent({ content: '', loading: true, nodeId });
+    setTooltipContent({ content: '', loading: true, nodeId, detailFile });
     if (!detailFile) {
-      setTooltipContent({ content: 'No detail file.', loading: false, nodeId });
+      setTooltipContent({ content: 'No detail file.', loading: false, nodeId, detailFile: null });
       return;
     }
     try {
       const content = await fetchFileContent(detailFile);
-      setTooltipContent({ content: content.slice(0, 800) + (content.length > 800 ? '\n…' : ''), loading: false, nodeId });
+      setTooltipContent({ content: content.slice(0, 800) + (content.length > 800 ? '\n…' : ''), loading: false, nodeId, detailFile });
     } catch {
-      setTooltipContent({ content: 'Could not load detail file.', loading: false, nodeId });
+      setTooltipContent({ content: 'Could not load detail file.', loading: false, nodeId, detailFile: null });
     }
   }, []);
 
@@ -493,11 +494,20 @@ export default function GraphView({ data, onNodeClick }: Props) {
       {tooltipContent && (
         <div
           className={styles.tooltip}
-          style={{ left: tooltipPos.x + 16, top: tooltipPos.y - 8 }}
+          style={{
+            left: tooltipPos.x + 16,
+            top: tooltipPos.y - 8,
+            cursor: tooltipContent.detailFile ? 'pointer' : 'default',
+          }}
           onMouseEnter={() => {
             if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
           }}
           onMouseLeave={hideTooltip}
+          onClick={() => {
+            if (tooltipContent.detailFile && onNodeClickRef.current) {
+              onNodeClickRef.current(tooltipContent.detailFile);
+            }
+          }}
         >
           {tooltipContent.loading ? (
             <span className={styles.tooltipLoading}>loading…</span>
