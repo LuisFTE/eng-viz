@@ -3,9 +3,20 @@ import * as d3 from 'd3';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkFrontmatter from 'remark-frontmatter';
+import type { Components } from 'react-markdown';
 import { GraphNode, GraphEdge, GraphData } from '../../types';
 import { fetchFileContent } from '../../hooks/useGraph';
+import MermaidBlock from '../MermaidBlock/MermaidBlock';
 import styles from './GraphView.module.css';
+
+const markdownComponents: Components = {
+  code({ className, children }) {
+    if (className === 'language-mermaid') {
+      return <MermaidBlock chart={String(children).trimEnd()} />;
+    }
+    return <code className={className}>{children}</code>;
+  },
+};
 
 // Types considered "infrastructure" — what pipeline-only mode keeps visible
 const PIPELINE_ONLY_TYPES = new Set([
@@ -49,7 +60,10 @@ interface TooltipPos {
 const TooltipBody = memo(function TooltipBody({ content }: { content: string }) {
   return (
     <div className={styles.tooltipContent}>
-      <ReactMarkdown remarkPlugins={[remarkFrontmatter, remarkGfm]}>
+      <ReactMarkdown
+        remarkPlugins={[remarkFrontmatter, remarkGfm]}
+        components={markdownComponents}
+      >
         {content}
       </ReactMarkdown>
     </div>
