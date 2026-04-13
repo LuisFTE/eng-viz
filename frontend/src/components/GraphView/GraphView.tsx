@@ -130,6 +130,7 @@ export default function GraphView({ data, onNodeClick }: Props) {
   // Ctrl = highlight mode: hover shows neighbors, suppresses tooltip
   const ctrlModeRef = useRef(false);
   const highlightRef = useRef<Set<string> | null>(null);
+  const filteredNodeIdsRef = useRef(new Set<string>());
 
   const [search, setSearch] = useState('');
   const [toolbarOpen, setToolbarOpen] = useState(true);
@@ -174,6 +175,7 @@ export default function GraphView({ data, onNodeClick }: Props) {
   });
 
   const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
+  filteredNodeIdsRef.current = filteredNodeIds;
   const filteredEdges = data.edges.filter(e => {
     const src = typeof e.source === 'string' ? e.source : (e.source as GraphNode).id;
     const tgt = typeof e.target === 'string' ? e.target : (e.target as GraphNode).id;
@@ -341,10 +343,11 @@ export default function GraphView({ data, onNodeClick }: Props) {
       linkLabel
         .attr('display', e => {
           if (connected && hoveredId) {
-            // Only outgoing edges from the hovered node get a label
             const src = (e.source as GraphNode).id;
             const tgt = (e.target as GraphNode).id;
-            return src === hoveredId && connected.has(tgt) ? null : 'none';
+            // Only outgoing edges whose target is currently visible
+            return src === hoveredId && connected.has(tgt) && filteredNodeIdsRef.current.has(tgt)
+              ? null : 'none';
           }
           return 'none';
         })
