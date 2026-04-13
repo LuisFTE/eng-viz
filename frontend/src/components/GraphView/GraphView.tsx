@@ -311,6 +311,7 @@ export default function GraphView({ data, onNodeClick }: Props) {
       .attr('fill', 'var(--text-muted)')
       .attr('font-size', 8)
       .attr('text-anchor', 'middle')
+      .attr('display', 'none') // hidden until ctrl highlight mode activates
       .text(e => e.type);
     linkLabelRef.current = linkLabel;
 
