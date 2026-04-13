@@ -352,14 +352,7 @@ export default function GraphView({ data, onNodeClick }: Props) {
         })
         .attr('opacity', 1)
         .attr('font-size', 10)
-        .text(e => {
-          const src = (e.source as GraphNode).id;
-          const tgt = (e.target as GraphNode).id;
-          if (!connected || !hoveredId || src !== hoveredId || !connected.has(tgt)) return e.type;
-          const srcLabel = (e.source as GraphNode).label;
-          const tgtLabel = (e.target as GraphNode).label;
-          return `${srcLabel} --${e.type}--> ${tgtLabel}`;
-        });
+        .text(e => e.type);
     };
 
     const node = g.append('g')
