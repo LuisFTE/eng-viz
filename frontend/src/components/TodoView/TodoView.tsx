@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkFrontmatter from 'remark-frontmatter';
@@ -23,13 +23,22 @@ export default function TodoView() {
   const suppressNextReload = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  // Refs used by useLayoutEffect to avoid stale closures
+  const savedScrollRef = useRef(0);
+  const initialCursorRef = useRef<string | undefined>(undefined);
+  const editBufferRef = useRef('');
+  editBufferRef.current = editBuffer;
+  // Stable ref to selected so loadFiles doesn't re-run on every file switch
+  const selectedRef = useRef('');
+  selectedRef.current = selected;
 
   // ── File loading ─────────────────────────────────────────────────────────
 
   const loadFiles = useCallback(async () => {
     const list = await fetchTodoFiles();
     setFiles(list);
-    if (!selected) {
+    // selectedRef avoids re-running this on every file switch
+    if (!selectedRef.current) {
       const today = new Date().toISOString().slice(0, 10);
       const pick =
         list.find(f => f.includes(today)) ??
@@ -37,7 +46,7 @@ export default function TodoView() {
         list[0];
       if (pick) setSelected(pick);
     }
-  }, [selected]);
+  }, []); // stable — runs once on mount
 
   const loadFile = useCallback(async (path: string) => {
     try {
@@ -96,31 +105,42 @@ export default function TodoView() {
     return () => window.removeEventListener('keydown', handler);
   }, [editing, handleSave, handleCancel]);
 
-  // Auto-resize textarea to fit content
+  // Capture scroll + cursor target before entering edit, then set state
+  const enterEdit = useCallback((cursorSearch?: string) => {
+    savedScrollRef.current = contentRef.current?.scrollTop ?? 0;
+    initialCursorRef.current = cursorSearch;
+    setEditBuffer(content);
+    setEditing(true);
+  }, [content]);
+
+  // After entering edit: resize textarea, restore scroll, focus — all before paint
+  useLayoutEffect(() => {
+    if (!editing) return;
+    const ta = textareaRef.current;
+    if (!ta) return;
+    // Resize first so the parent div has the correct scroll height
+    ta.style.height = 'auto';
+    ta.style.height = `${ta.scrollHeight}px`;
+    // Restore scroll position
+    if (contentRef.current) contentRef.current.scrollTop = savedScrollRef.current;
+    // Focus and jump cursor to double-clicked word
+    ta.focus();
+    const search = initialCursorRef.current;
+    if (search) {
+      const pos = editBufferRef.current.indexOf(search);
+      if (pos !== -1) ta.setSelectionRange(pos, pos);
+      initialCursorRef.current = undefined;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
+  // Auto-resize on every keystroke
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta || !editing) return;
     ta.style.height = 'auto';
     ta.style.height = `${ta.scrollHeight}px`;
   }, [editBuffer, editing]);
-
-  // Focus textarea, restore scroll position, and jump cursor to clicked word
-  const enterEdit = useCallback((cursorSearch?: string) => {
-    const savedScroll = contentRef.current?.scrollTop ?? 0;
-    setEditBuffer(content);
-    setEditing(true);
-    requestAnimationFrame(() => {
-      const ta = textareaRef.current;
-      if (!ta) return;
-      // Restore scroll position on the content container
-      if (contentRef.current) contentRef.current.scrollTop = savedScroll;
-      ta.focus();
-      if (cursorSearch) {
-        const pos = content.indexOf(cursorSearch);
-        if (pos !== -1) ta.setSelectionRange(pos, pos);
-      }
-    });
-  }, [content]);
 
   // ── Checkbox toggle ──────────────────────────────────────────────────────
 
