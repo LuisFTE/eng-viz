@@ -287,10 +287,10 @@ export default function GraphView({ data, onNodeClick }: Props) {
     }));
 
     const sim = d3.forceSimulation<GraphNode>(nodes)
-      .force('link', d3.forceLink<GraphNode, GraphEdge>(edges).id(n => n.id).distance(100))
-      .force('charge', d3.forceManyBody().strength(-250).distanceMax(400))
+      .force('link', d3.forceLink<GraphNode, GraphEdge>(edges).id(n => n.id).distance(160))
+      .force('charge', d3.forceManyBody().strength(-600).distanceMax(600))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide(40));
+      .force('collision', d3.forceCollide(50));
 
     simRef.current = sim;
 
@@ -353,7 +353,7 @@ export default function GraphView({ data, onNodeClick }: Props) {
       .style('cursor', 'grab')
       .on('mouseover', (event: MouseEvent, n: GraphNode) => {
         void showTooltip(n.id, event.clientX, event.clientY, n.detailFile);
-        if (event.shiftKey) {
+        if (event.ctrlKey) {
           const connected = new Set<string>([n.id, ...(neighbors.get(n.id) ?? [])]);
           applyHighlight(connected);
         }
