@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import * as d3 from 'd3';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -34,13 +34,27 @@ function nodeColor(type: string): string {
   return NODE_COLORS[type.toLowerCase()] ?? 'var(--node-unknown)';
 }
 
-interface TooltipState {
-  x: number;
-  y: number;
+interface TooltipContent {
   content: string;
   loading: boolean;
   nodeId: string;
 }
+
+interface TooltipPos {
+  x: number;
+  y: number;
+}
+
+// Memoized so it only re-renders when content changes, not on every mousemove.
+const TooltipBody = memo(function TooltipBody({ content }: { content: string }) {
+  return (
+    <div className={styles.tooltipContent}>
+      <ReactMarkdown remarkPlugins={[remarkFrontmatter, remarkGfm]}>
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+});
 
 interface Props {
   data: GraphData;
@@ -61,7 +75,8 @@ export default function GraphView({ data, onNodeClick }: Props) {
   const [hoveredFilter, setHoveredFilter] = useState<string | null>(null);
   const filterHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [tooltipContent, setTooltipContent] = useState<TooltipContent | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<TooltipPos>({ x: 0, y: 0 });
   const tooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const nodeTypes = Array.from(new Set(data.nodes.map(n => n.type))).sort();
@@ -144,21 +159,22 @@ export default function GraphView({ data, onNodeClick }: Props) {
   // ── Tooltip ───────────────────────────────────────────────────────────────
   const showTooltip = useCallback(async (nodeId: string, x: number, y: number, detailFile: string | null) => {
     if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
-    setTooltip({ x, y, content: '', loading: true, nodeId });
+    setTooltipPos({ x, y });
+    setTooltipContent({ content: '', loading: true, nodeId });
     if (!detailFile) {
-      setTooltip({ x, y, content: 'No detail file.', loading: false, nodeId });
+      setTooltipContent({ content: 'No detail file.', loading: false, nodeId });
       return;
     }
     try {
       const content = await fetchFileContent(detailFile);
-      setTooltip({ x, y, content: content.slice(0, 800) + (content.length > 800 ? '\n…' : ''), loading: false, nodeId });
+      setTooltipContent({ content: content.slice(0, 800) + (content.length > 800 ? '\n…' : ''), loading: false, nodeId });
     } catch {
-      setTooltip({ x, y, content: 'Could not load detail file.', loading: false, nodeId });
+      setTooltipContent({ content: 'Could not load detail file.', loading: false, nodeId });
     }
   }, []);
 
   const hideTooltip = useCallback(() => {
-    tooltipTimeoutRef.current = setTimeout(() => setTooltip(null), 150);
+    tooltipTimeoutRef.current = setTimeout(() => setTooltipContent(null), 150);
   }, []);
 
   // ── D3 graph ──────────────────────────────────────────────────────────────
@@ -244,7 +260,7 @@ export default function GraphView({ data, onNodeClick }: Props) {
         void showTooltip(n.id, event.clientX, event.clientY, n.detailFile);
       })
       .on('mousemove', (event: MouseEvent) => {
-        setTooltip(prev => prev ? { ...prev, x: event.clientX, y: event.clientY } : null);
+        setTooltipPos({ x: event.clientX, y: event.clientY });
       })
       .on('mouseout', hideTooltip)
       .on('click', (_event: MouseEvent, n: GraphNode) => {
@@ -415,23 +431,19 @@ export default function GraphView({ data, onNodeClick }: Props) {
 
       <svg ref={svgRef} className={styles.svg} />
 
-      {tooltip && (
+      {tooltipContent && (
         <div
           className={styles.tooltip}
-          style={{ left: tooltip.x + 16, top: tooltip.y - 8 }}
+          style={{ left: tooltipPos.x + 16, top: tooltipPos.y - 8 }}
           onMouseEnter={() => {
             if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
           }}
           onMouseLeave={hideTooltip}
         >
-          {tooltip.loading ? (
+          {tooltipContent.loading ? (
             <span className={styles.tooltipLoading}>loading…</span>
           ) : (
-            <div className={styles.tooltipContent}>
-              <ReactMarkdown remarkPlugins={[remarkFrontmatter, remarkGfm]}>
-                {tooltip.content}
-              </ReactMarkdown>
-            </div>
+            <TooltipBody content={tooltipContent.content} />
           )}
         </div>
       )}
