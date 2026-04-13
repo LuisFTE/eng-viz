@@ -6,12 +6,14 @@
   overflow: hidden;
 }
 
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
 .header {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   padding: 0 16px;
-  height: 44px;
+  height: 40px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -19,18 +21,18 @@
 
 .logo {
   font-weight: 700;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--accent);
-  letter-spacing: 0.04em;
-  min-width: 80px;
+  letter-spacing: 0.05em;
+  min-width: 72px;
 }
 
-.nav {
+.panelToggles {
   display: flex;
-  gap: 4px;
+  gap: 3px;
 }
 
-.kbSwitcher {
+.right {
   margin-left: auto;
   display: flex;
   align-items: center;
@@ -47,8 +49,84 @@
   color: var(--red);
 }
 
-.main {
+/* ── Workspace ───────────────────────────────────────────────────────────── */
+
+.workspace {
   flex: 1;
-  overflow: hidden;
   display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Main row ────────────────────────────────────────────────────────────── */
+
+.mainRow {
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Individual panel ────────────────────────────────────────────────────── */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+
+.termPanel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  flex-shrink: 0;
+}
+
+.panelLabel {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 3px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+/* ── Dividers ────────────────────────────────────────────────────────────── */
+
+.hDivider {
+  width: 4px;
+  flex-shrink: 0;
+  background: var(--border);
+  cursor: col-resize;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 10;
+}
+
+.hDivider:hover,
+.hDivider:active {
+  background: var(--accent);
+}
+
+.vDivider {
+  height: 4px;
+  flex-shrink: 0;
+  background: var(--border);
+  cursor: row-resize;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 10;
+}
+
+.vDivider:hover,
+.vDivider:active {
+  background: var(--accent);
 }
