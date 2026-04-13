@@ -28,6 +28,9 @@ export default function TodoView() {
   const initialCursorRef = useRef<string | undefined>(undefined);
   const editBufferRef = useRef('');
   editBufferRef.current = editBuffer;
+  // editingRef lets auto-resize useEffect guard without editing in its deps
+  const editingRef = useRef(false);
+  editingRef.current = editing;
   // Stable ref to selected so loadFiles doesn't re-run on every file switch
   const selectedRef = useRef('');
   selectedRef.current = selected;
@@ -113,17 +116,14 @@ export default function TodoView() {
     setEditing(true);
   }, [content]);
 
-  // After entering edit: resize textarea, restore scroll, focus — all before paint
+  // On entering edit: resize + restore scroll + focus, all before paint.
   useLayoutEffect(() => {
     if (!editing) return;
     const ta = textareaRef.current;
     if (!ta) return;
-    // Resize first so the parent div has the correct scroll height
     ta.style.height = 'auto';
     ta.style.height = `${ta.scrollHeight}px`;
-    // Restore scroll position
     if (contentRef.current) contentRef.current.scrollTop = savedScrollRef.current;
-    // Focus and jump cursor to double-clicked word
     ta.focus();
     const search = initialCursorRef.current;
     if (search) {
@@ -134,13 +134,19 @@ export default function TodoView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
-  // Auto-resize on every keystroke
+  // Auto-resize on keystrokes. `editing` intentionally omitted from deps —
+  // keeping it out means this effect never fires on the mode switch itself,
+  // so it can't clobber the scroll restoration done by the useLayoutEffect above.
+  // editingRef is used as a guard instead.
   useEffect(() => {
     const ta = textareaRef.current;
-    if (!ta || !editing) return;
+    if (!ta || !editingRef.current) return;
+    const prevScroll = contentRef.current?.scrollTop ?? 0;
     ta.style.height = 'auto';
     ta.style.height = `${ta.scrollHeight}px`;
-  }, [editBuffer, editing]);
+    if (contentRef.current) contentRef.current.scrollTop = prevScroll;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editBuffer]);
 
   // ── Checkbox toggle ──────────────────────────────────────────────────────
 
