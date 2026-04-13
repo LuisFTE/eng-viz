@@ -188,7 +188,7 @@
 
 .editor {
   width: 100%;
-  min-height: 100%;
+  /* No min-height: 100% — lets the parent div measure true scroll height */
   background: var(--surface2);
   color: var(--text);
   border: none;
@@ -198,8 +198,8 @@
   line-height: 1.75;
   resize: none;
   outline: none;
-  /* auto-resize: height set by JS, overflow hidden prevents scrollbar flash */
-  overflow: hidden;
+  /* overflow-y: hidden prevents textarea's own scrollbar; parent div scrolls */
+  overflow-y: hidden;
   box-sizing: border-box;
 }
 

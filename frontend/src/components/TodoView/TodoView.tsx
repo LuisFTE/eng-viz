@@ -22,6 +22,7 @@ export default function TodoView() {
 
   const suppressNextReload = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // ── File loading ─────────────────────────────────────────────────────────
 
@@ -103,19 +104,20 @@ export default function TodoView() {
     ta.style.height = `${ta.scrollHeight}px`;
   }, [editBuffer, editing]);
 
-  // Focus textarea and restore cursor when entering edit mode
+  // Focus textarea, restore scroll position, and jump cursor to clicked word
   const enterEdit = useCallback((cursorSearch?: string) => {
+    const savedScroll = contentRef.current?.scrollTop ?? 0;
     setEditBuffer(content);
     setEditing(true);
     requestAnimationFrame(() => {
       const ta = textareaRef.current;
       if (!ta) return;
+      // Restore scroll position on the content container
+      if (contentRef.current) contentRef.current.scrollTop = savedScroll;
       ta.focus();
       if (cursorSearch) {
         const pos = content.indexOf(cursorSearch);
-        if (pos !== -1) {
-          ta.setSelectionRange(pos, pos);
-        }
+        if (pos !== -1) ta.setSelectionRange(pos, pos);
       }
     });
   }, [content]);
@@ -274,7 +276,7 @@ export default function TodoView() {
           </div>
         </div>
 
-        <div className={styles.content}>
+        <div className={styles.content} ref={contentRef}>
           {editing ? (
             <textarea
               ref={textareaRef}
