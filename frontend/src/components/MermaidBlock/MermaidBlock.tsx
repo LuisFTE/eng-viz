@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 
-let idCounter = 0;
-
 interface Props {
   chart: string;
 }
 
 export default function MermaidBlock({ chart }: Props) {
-  const id = useRef(`mermaid-${++idCounter}`);
+  // Use a stable random ID per instance — avoids stale DOM elements from
+  // HMR reloads or StrictMode double-mount that share a counter.
+  const id = useRef(`mermaid-${crypto.randomUUID()}`);
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,6 +19,11 @@ export default function MermaidBlock({ chart }: Props) {
     void (async () => {
       try {
         const { svg } = await mermaid.render(id.current, chart);
+        // Mermaid v10+ sometimes returns an error SVG instead of throwing.
+        // Detect it and fall back to plain source.
+        if (svg.includes('Syntax error')) {
+          throw new Error('Syntax error in diagram');
+        }
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
         }
