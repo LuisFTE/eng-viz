@@ -61,9 +61,25 @@ interface Props {
   onNodeClick?: (filePath: string) => void;
 }
 
+type NodeSel = d3.Selection<SVGCircleElement, GraphNode, SVGGElement, unknown>;
+type LinkSel = d3.Selection<SVGLineElement, GraphEdge, SVGGElement, unknown>;
+type TextSel<D> = d3.Selection<SVGTextElement, D, SVGGElement, unknown>;
+
 export default function GraphView({ data, onNodeClick }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const simRef = useRef<d3.Simulation<GraphNode, GraphEdge> | null>(null);
+
+  // D3 selections kept across renders so the visibility effect can update
+  // them without rebuilding the simulation.
+  const nodeSelRef = useRef<NodeSel | null>(null);
+  const linkSelRef = useRef<LinkSel | null>(null);
+  const nodeLabelRef = useRef<TextSel<GraphNode> | null>(null);
+  const linkLabelRef = useRef<TextSel<GraphEdge> | null>(null);
+
+  // Stable ref so the simulation effect doesn't re-run when onNodeClick changes.
+  const onNodeClickRef = useRef(onNodeClick);
+  useEffect(() => { onNodeClickRef.current = onNodeClick; }, [onNodeClick]);
+
   const [search, setSearch] = useState('');
   const [toolbarOpen, setToolbarOpen] = useState(true);
 
@@ -96,7 +112,7 @@ export default function GraphView({ data, onNodeClick }: Props) {
       })()
     : null;
 
-  // ── Node / edge filtering ─────────────────────────────────────────────────
+  // ── Filtered sets (used for toolbar counts and visibility effect) ─────────
   const filteredNodes = data.nodes.filter(n => {
     if (pipelineOnly && !PIPELINE_ONLY_TYPES.has(n.type.toLowerCase())) return false;
     if (onlyType && n.type !== onlyType) return false;
@@ -113,15 +129,9 @@ export default function GraphView({ data, onNodeClick }: Props) {
     return filteredNodeIds.has(src) && filteredNodeIds.has(tgt);
   });
 
-  // Stable keys that capture actual data identity, not just count.
-  // Using these in the d3 effect dep array means the graph redraws whenever
-  // node/edge identity changes, not just when the count happens to differ.
+  // String key representing visible node identity — changes only when the
+  // visible set actually changes, used to trigger the visibility effect.
   const nodeKey = filteredNodes.map(n => n.id).join('\0');
-  const edgeKey = filteredEdges.map(e => {
-    const s = typeof e.source === 'string' ? e.source : (e.source as GraphNode).id;
-    const t = typeof e.target === 'string' ? e.target : (e.target as GraphNode).id;
-    return `${s}→${t}`;
-  }).join('\0');
 
   // ── Filter helpers ────────────────────────────────────────────────────────
   const resetFilters = () => {
@@ -177,7 +187,9 @@ export default function GraphView({ data, onNodeClick }: Props) {
     tooltipTimeoutRef.current = setTimeout(() => setTooltipContent(null), 150);
   }, []);
 
-  // ── D3 graph ──────────────────────────────────────────────────────────────
+  // ── Effect 1: build simulation ────────────────────────────────────────────
+  // Runs only when server data changes (KB switch or file-watcher reload).
+  // Filter changes do NOT restart the simulation — Effect 2 handles that.
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -212,10 +224,10 @@ export default function GraphView({ data, onNodeClick }: Props) {
       .attr('d', 'M0,-5L10,0L0,5')
       .attr('fill', 'var(--border)');
 
-    const nodes: GraphNode[] = filteredNodes.map(n => ({ ...n }));
+    // Build from ALL nodes/edges — filtering is handled by Effect 2.
+    const nodes: GraphNode[] = data.nodes.map(n => ({ ...n }));
     const nodesById = new Map(nodes.map(n => [n.id, n]));
-
-    const edges: GraphEdge[] = filteredEdges.map(e => ({
+    const edges: GraphEdge[] = data.edges.map(e => ({
       ...e,
       source: nodesById.get(typeof e.source === 'string' ? e.source : (e.source as GraphNode).id) ?? e.source,
       target: nodesById.get(typeof e.target === 'string' ? e.target : (e.target as GraphNode).id) ?? e.target,
@@ -230,22 +242,23 @@ export default function GraphView({ data, onNodeClick }: Props) {
     simRef.current = sim;
 
     const link = g.append('g')
-      .selectAll('line')
+      .selectAll<SVGLineElement, GraphEdge>('line')
       .data(edges)
       .join('line')
       .attr('stroke', 'var(--border)')
       .attr('stroke-width', 1.5)
       .attr('marker-end', 'url(#arrow)');
+    linkSelRef.current = link;
 
-    // Edge labels — positioned 20% from source, small font
     const linkLabel = g.append('g')
-      .selectAll('text')
+      .selectAll<SVGTextElement, GraphEdge>('text')
       .data(edges)
       .join('text')
       .attr('fill', 'var(--text-muted)')
       .attr('font-size', 8)
       .attr('text-anchor', 'middle')
       .text(e => e.type);
+    linkLabelRef.current = linkLabel;
 
     const node = g.append('g')
       .selectAll<SVGCircleElement, GraphNode>('circle')
@@ -264,7 +277,7 @@ export default function GraphView({ data, onNodeClick }: Props) {
       })
       .on('mouseout', hideTooltip)
       .on('click', (_event: MouseEvent, n: GraphNode) => {
-        if (onNodeClick && n.detailFile) onNodeClick(n.detailFile);
+        if (onNodeClickRef.current && n.detailFile) onNodeClickRef.current(n.detailFile);
       })
       .call(
         d3.drag<SVGCircleElement, GraphNode>()
@@ -283,9 +296,10 @@ export default function GraphView({ data, onNodeClick }: Props) {
             event.subject.fy = null;
           })
       );
+    nodeSelRef.current = node;
 
     const label = g.append('g')
-      .selectAll('text')
+      .selectAll<SVGTextElement, GraphNode>('text')
       .data(nodes)
       .join('text')
       .attr('fill', 'var(--text)')
@@ -294,6 +308,7 @@ export default function GraphView({ data, onNodeClick }: Props) {
       .attr('dy', 26)
       .text(n => n.label)
       .style('pointer-events', 'none');
+    nodeLabelRef.current = label;
 
     sim.on('tick', () => {
       link
@@ -302,7 +317,6 @@ export default function GraphView({ data, onNodeClick }: Props) {
         .attr('x2', e => (e.target as GraphNode).x ?? 0)
         .attr('y2', e => (e.target as GraphNode).y ?? 0);
 
-      // Place label 20% along the edge from source
       linkLabel
         .attr('x', e => {
           const sx = (e.source as GraphNode).x ?? 0;
@@ -312,23 +326,54 @@ export default function GraphView({ data, onNodeClick }: Props) {
         .attr('y', e => {
           const sy = (e.source as GraphNode).y ?? 0;
           const ty = (e.target as GraphNode).y ?? 0;
-          return sy + (ty - sy) * 0.2 - 4; // slight offset above the line
+          return sy + (ty - sy) * 0.2 - 4;
         });
 
       node.attr('cx', n => n.x ?? 0).attr('cy', n => n.y ?? 0);
       label.attr('x', n => n.x ?? 0).attr('y', n => n.y ?? 0);
     });
 
-    if (search) {
-      node.attr('stroke', n =>
-        n.label.toLowerCase().includes(search.toLowerCase()) ? '#fff' : 'var(--bg)'
-      ).attr('stroke-width', n =>
-        n.label.toLowerCase().includes(search.toLowerCase()) ? 3 : 2
-      );
-    }
+    return () => {
+      sim.stop();
+      nodeSelRef.current = null;
+      linkSelRef.current = null;
+      nodeLabelRef.current = null;
+      linkLabelRef.current = null;
+    };
+  }, [data, showTooltip, hideTooltip]); // filter state intentionally excluded
 
-    return () => { sim.stop(); };
-  }, [nodeKey, edgeKey, search, onNodeClick]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ── Effect 2: update visibility ───────────────────────────────────────────
+  // Runs when filter/search state changes. Just toggles display on existing
+  // D3 elements — no simulation teardown, no nodes flying around.
+  useEffect(() => {
+    const nodeSel = nodeSelRef.current;
+    const linkSel = linkSelRef.current;
+    if (!nodeSel || !linkSel) return;
+
+    const term = search.toLowerCase();
+
+    nodeSel
+      .attr('display', (n: GraphNode) => filteredNodeIds.has(n.id) ? null : 'none')
+      .attr('stroke', (n: GraphNode) =>
+        filteredNodeIds.has(n.id) && search && n.label.toLowerCase().includes(term) ? '#fff' : 'var(--bg)'
+      )
+      .attr('stroke-width', (n: GraphNode) =>
+        filteredNodeIds.has(n.id) && search && n.label.toLowerCase().includes(term) ? 3 : 2
+      );
+
+    nodeLabelRef.current?.attr('display', (n: GraphNode) => filteredNodeIds.has(n.id) ? null : 'none');
+
+    const edgeVisible = (e: GraphEdge): boolean => {
+      const src = typeof e.source === 'string' ? e.source : (e.source as GraphNode).id;
+      const tgt = typeof e.target === 'string' ? e.target : (e.target as GraphNode).id;
+      return filteredNodeIds.has(src) && filteredNodeIds.has(tgt);
+    };
+
+    linkSel.attr('display', (e: GraphEdge) => edgeVisible(e) ? null : 'none');
+    linkLabelRef.current?.attr('display', (e: GraphEdge) => edgeVisible(e) ? null : 'none');
+  }, [nodeKey, search]); // eslint-disable-line react-hooks/exhaustive-deps
+  // nodeKey changes whenever filteredNodeIds changes, so filteredNodeIds in
+  // the closure above is always current when this effect fires.
 
   const isFiltered = onlyType !== null || hiddenTypes.size > 0 || pipelineFilter !== null || pipelineOnly;
 
