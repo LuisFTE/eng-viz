@@ -7,11 +7,11 @@ export function kbRouter(kbsRoot: string, getActive: () => string): Router {
   const router = Router();
 
   function activeKbPath(): string {
-    return path.join(kbsRoot, getActive(), 'eng-kb');
+    return path.join(kbsRoot, getActive());
   }
 
   function activeTodoPath(): string {
-    return path.join(kbsRoot, getActive(), 'eng-todo');
+    return path.join(kbsRoot, getActive(), 'plugins', 'eng-todo');
   }
 
   // List available companies (KB switcher)
