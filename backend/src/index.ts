@@ -17,7 +17,16 @@ function getActive(): string {
     const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')) as { active: string };
     return cfg.active;
   } catch {
-    return 'sample-kb';
+    return 'acme-corp';
+  }
+}
+
+function getExternals(): string[] {
+  try {
+    const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')) as { externals?: string[] };
+    return cfg.externals ?? [];
+  } catch {
+    return [];
   }
 }
 
@@ -32,7 +41,7 @@ app.use(cors());
 app.use(express.json());
 
 // KB API
-app.use('/api/kb', kbRouter(KBS_ROOT, getActive));
+app.use('/api/kb', kbRouter(KBS_ROOT, getActive, getExternals));
 
 // Switch active company
 app.post('/api/kb/active', (req, res) => {

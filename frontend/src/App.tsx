@@ -284,7 +284,10 @@ export default function App() {
         <div className={styles.right}>
           {companies.length > 0 && (
             <select value={activeCompany} onChange={e => void handleCompanySwitch(e.target.value)} title="Switch KB">
-              {companies.map(c => <option key={c} value={c}>{c}</option>)}
+              {companies.map(c => {
+                const label = c.includes('/') ? c.split('/').pop()! : c;
+                return <option key={c} value={c}>{label}</option>;
+              })}
             </select>
           )}
           {loading && <span className={styles.status}>loading…</span>}

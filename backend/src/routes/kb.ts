@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 
-export function kbRouter(kbsRoot: string, getActive: () => string): Router {
+export function kbRouter(kbsRoot: string, getActive: () => string, getExternals: () => string[] = () => []): Router {
   const router = Router();
 
   // active can be a plain name ("acme-corp") resolved under kbsRoot,
@@ -17,17 +17,16 @@ export function kbRouter(kbsRoot: string, getActive: () => string): Router {
     return path.join(activeKbPath(), 'plugins', 'eng-todo');
   }
 
-  // List available companies (KB switcher)
+  // List available companies (KB switcher).
+  // Returns local kbs/ folder names plus any absolute paths from config externals.
   router.get('/companies', (_req: Request, res: Response) => {
-    if (!fs.existsSync(kbsRoot)) {
-      res.json([]);
-      return;
-    }
-    const entries = fs.readdirSync(kbsRoot, { withFileTypes: true });
-    const companies = entries
-      .filter(e => e.isDirectory() || e.isSymbolicLink())
-      .map(e => e.name);
-    res.json(companies);
+    const local: string[] = fs.existsSync(kbsRoot)
+      ? fs.readdirSync(kbsRoot, { withFileTypes: true })
+          .filter(e => e.isDirectory() || e.isSymbolicLink())
+          .map(e => e.name)
+      : [];
+    const externals = getExternals().filter(p => fs.existsSync(p));
+    res.json([...local, ...externals]);
   });
 
   // Get active company + its KB path + whether todo exists
