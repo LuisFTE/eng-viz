@@ -131,9 +131,6 @@ export default function GraphView({ data, onNodeClick }: Props) {
   const ctrlModeRef = useRef(false);
   const highlightRef = useRef<Set<string> | null>(null);
 
-  const [showLinkLabels, setShowLinkLabels] = useState(false);
-  const showLinkLabelsRef = useRef(false);
-
   const [search, setSearch] = useState('');
   const [toolbarOpen, setToolbarOpen] = useState(true);
 
@@ -348,7 +345,7 @@ export default function GraphView({ data, onNodeClick }: Props) {
             const tgt = (e.target as GraphNode).id;
             return src === hoveredId && connected.has(tgt) ? null : 'none';
           }
-          return showLinkLabelsRef.current ? null : 'none';
+          return 'none';
         })
         .attr('opacity', 1)
         .attr('font-size', 10)
@@ -423,7 +420,7 @@ export default function GraphView({ data, onNodeClick }: Props) {
         .attr('x2', e => (e.target as GraphNode).x ?? 0)
         .attr('y2', e => (e.target as GraphNode).y ?? 0);
 
-      const labelT = highlightRef.current ? 0.5 : 0.2;
+      const labelT = 0.5;
       linkLabel
         .attr('x', e => {
           const sx = (e.source as GraphNode).x ?? 0;
@@ -500,15 +497,11 @@ export default function GraphView({ data, onNodeClick }: Props) {
     };
 
     linkSel.attr('display', (e: GraphEdge) => edgeVisible(e) ? null : 'none');
-    // Link labels: hidden by default, only show when toggle is on (highlight mode overrides this)
-    linkLabelRef.current?.attr('display', (e: GraphEdge) => {
-      if (!showLinkLabels) return 'none';
-      return edgeVisible(e) ? null : 'none';
-    });
+    linkLabelRef.current?.attr('display', 'none'); // always hidden in normal mode
 
     // Reheat so nodes re-arrange around the new visible set
     simRef.current?.alpha(0.3).restart();
-  }, [nodeKey, search, showLinkLabels]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [nodeKey, search]); // eslint-disable-line react-hooks/exhaustive-deps
   // nodeKey changes whenever filteredNodeIds changes, so filteredNodeIds in
   // the closure above is always current when this effect fires.
 
@@ -543,19 +536,6 @@ export default function GraphView({ data, onNodeClick }: Props) {
                 title="Show all"
               >
                 all
-              </button>
-
-              <button
-                className={showLinkLabels ? styles.filterOnly : ''}
-                onClick={() => {
-                  setShowLinkLabels(v => {
-                    showLinkLabelsRef.current = !v;
-                    return !v;
-                  });
-                }}
-                title="Toggle relationship labels on edges"
-              >
-                link labels
               </button>
 
               <button
