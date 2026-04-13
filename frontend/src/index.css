@@ -1,0 +1,81 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #242736;
+  --border: #2e3245;
+  --text: #e2e4ed;
+  --text-muted: #7b82a0;
+  --accent: #7c6af7;
+  --accent2: #4fc3f7;
+  --green: #4caf7d;
+  --orange: #f5a623;
+  --red: #e05c5c;
+
+  --node-service: #7c6af7;
+  --node-pipeline: #4fc3f7;
+  --node-component: #4caf7d;
+  --node-db: #f5a623;
+  --node-topic: #e05c5c;
+  --node-tech: #a78bfa;
+  --node-unknown: #7b82a0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 13px;
+}
+
+button {
+  cursor: pointer;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  transition: background 0.15s;
+}
+
+button:hover {
+  background: var(--border);
+}
+
+button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+input, select {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--accent);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
